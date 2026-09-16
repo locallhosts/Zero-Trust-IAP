@@ -15,6 +15,12 @@ Instead of treating a user as trusted simply because they are connected to a VPN
 - **Whether credentials and certificates are still valid**
 - **Whether adaptive risk changes the final decision**
 
+## Zero Trust Request Flow Demo
+
+The request flow below shows the local Zero Trust enforcement path from identity verification through policy and risk evaluation to the final allow/deny decision.
+
+![Zero Trust Request Flow](docs/demo/videos/01-zero-trust-request-flow.gif)
+
 ## Architecture
 
 ```text
