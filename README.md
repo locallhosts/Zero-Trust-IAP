@@ -266,6 +266,28 @@ A useful end-to-end demonstration is:
 9. Open **Cert Rotation** to inspect the active certificate lifecycle.
 10. Switch the Dashboard between light and dark mode if you want to demonstrate the UI preference persistence.
 
+## Demo assets
+
+The repository includes captured screenshots and short GIF demonstrations of the local Zero Trust workflow.
+
+### Screenshots
+
+- [Admin Dashboard](docs/demo/screenshots/01-admin-dashboard.png)
+- [Live mTLS Deny](docs/demo/screenshots/02-live-mtls-deny.png)
+- [Adaptive Risk / Quarantine](docs/demo/screenshots/03-adaptive-risk-quarantine.png)
+- [Security Lab Allow](docs/demo/screenshots/04-security-lab-allow.png)
+- [Access Logs](docs/demo/screenshots/05-access-logs.png)
+- [Certificate Rotation](docs/demo/screenshots/06-certificate-rotation.png)
+- [Protected Dashboard](docs/demo/screenshots/07-protected-dashboard.png)
+
+### Videos / GIFs
+
+- [Zero Trust Request Flow](docs/demo/videos/01-zero-trust-request-flow.gif)
+- [Adaptive Risk and Quarantine](docs/demo/videos/02-adaptive-risk-and-quarantine.gif)
+- [Security Lab Policy Replay](docs/demo/videos/03-security-lab-policy-replay.gif)
+
+These assets provide a visual walkthrough of identity verification, mTLS enforcement, adaptive risk decisions, policy replay, access logging, certificate lifecycle information and the protected upstream application.
+
 ## Security model
 
 Every protected request is evaluated at the application boundary. The proxy authenticates the presented identity, validates certificate/JWT properties, obtains device posture when configured, evaluates the policy engine, evaluates adaptive risk and only forwards requests that satisfy the configured controls.
@@ -307,7 +329,7 @@ certs/               OpenSSL-based local certificate generation
 configs/             example proxy and policy configuration
 deploy/              Docker Compose reference deployment
 scripts/dev-up.sh    one-command local demo startup
-docs/                architecture and VPN comparison notes
+docs/                architecture, VPN comparison and demo assets
 ```
 
 ## Testing
