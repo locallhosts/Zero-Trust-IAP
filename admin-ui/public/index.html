@@ -8,95 +8,60 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <span class="brand-mark">◆</span>
-      <span>Zero-Trust IAP</span>
-      <span class="brand-sub">Admin Console</span>
-    </div>
-    <div class="token-bar">
-      <label for="admin-token-input">Admin token</label>
-      <input id="admin-token-input" type="password" placeholder="X-Admin-Token" />
-      <button id="admin-token-save">Save</button>
-    </div>
+    <div class="brand"><span class="brand-mark">◆</span><span>Zero-Trust IAP</span><span class="brand-sub">Admin Console</span></div>
+    <div class="token-bar"><label for="admin-token-input">Admin token</label><input id="admin-token-input" type="password" placeholder="X-Admin-Token" /><button id="admin-token-save">Save</button></div>
   </header>
-
   <nav class="tabs">
     <button data-tab="policies" class="active">Policies</button>
     <button data-tab="logs">Access Logs</button>
+    <button data-tab="security">Security Lab</button>
     <button data-tab="rotation">Cert Rotation</button>
   </nav>
-
   <main>
     <section class="tab-panel" data-panel="policies">
-      <div class="panel-header">
-        <h1>Access Policies</h1>
-        <button id="new-policy-btn" class="primary">+ New Policy</button>
-      </div>
+      <div class="panel-header"><h1>Access Policies</h1><button id="new-policy-btn" class="primary">+ New Policy</button></div>
       <div id="policies-list" class="cards-grid"></div>
-
       <div id="policy-editor" class="editor hidden">
         <h2>Edit Policy</h2>
         <div class="form-grid">
-          <label>ID
-            <input id="f-id" type="text" placeholder="e.g. engineers-full-app-access" />
-          </label>
-          <label class="checkbox-label">
-            <input id="f-enabled" type="checkbox" />
-            Enabled
-          </label>
-          <label class="full-width">Description
-            <textarea id="f-describe" rows="2" placeholder="What this policy is for"></textarea>
-          </label>
-          <label class="full-width">Subjects (one per line — SPIFFE IDs or "*", supports trailing "*" wildcard)
-            <textarea id="f-subjects" rows="3" placeholder="spiffe://iap.local/team/engineering/*"></textarea>
-          </label>
-          <label class="full-width">Path prefixes (one per line)
-            <textarea id="f-paths" rows="2" placeholder="/dashboard"></textarea>
-          </label>
-          <label class="full-width">Methods (comma-separated, blank = any)
-            <input id="f-methods" type="text" placeholder="GET, POST" />
-          </label>
-          <fieldset class="full-width posture-fields">
-            <legend>Required device posture</legend>
-            <label class="checkbox-label"><input id="f-disk" type="checkbox" /> Disk encryption</label>
-            <label class="checkbox-label"><input id="f-edr" type="checkbox" /> EDR running</label>
-            <label>Min patch level (YYYY-MM-DD)
-              <input id="f-patch" type="text" placeholder="2026-06-01" />
-            </label>
-          </fieldset>
+          <label>ID<input id="f-id" type="text" placeholder="e.g. engineers-full-app-access" /></label>
+          <label class="checkbox-label"><input id="f-enabled" type="checkbox" /> Enabled</label>
+          <label class="full-width">Description<textarea id="f-describe" rows="2"></textarea></label>
+          <label class="full-width">Subjects<textarea id="f-subjects" rows="3" placeholder="spiffe://iap.local/team/engineering/*"></textarea></label>
+          <label class="full-width">Path prefixes<textarea id="f-paths" rows="2" placeholder="/dashboard"></textarea></label>
+          <label class="full-width">Methods<input id="f-methods" type="text" placeholder="GET, POST" /></label>
+          <fieldset class="full-width posture-fields"><legend>Required device posture</legend><label class="checkbox-label"><input id="f-disk" type="checkbox" /> Disk encryption</label><label class="checkbox-label"><input id="f-edr" type="checkbox" /> EDR running</label><label>Min patch level<input id="f-patch" type="text" placeholder="2026-06-01" /></label></fieldset>
         </div>
-        <div class="editor-actions">
-          <button id="editor-save" class="primary">Save Policy</button>
-          <button id="editor-cancel">Cancel</button>
-        </div>
+        <div class="editor-actions"><button id="editor-save" class="primary">Save Policy</button><button id="editor-cancel">Cancel</button></div>
       </div>
     </section>
 
     <section class="tab-panel hidden" data-panel="logs">
-      <div class="panel-header">
-        <h1>Access Logs</h1>
-        <span class="muted">Auto-refreshes every 5s</span>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Time</th><th>Subject</th><th>Request</th><th>Auth</th><th>Decision</th><th>Policy</th><th>Reason</th>
-            </tr>
-          </thead>
-          <tbody id="logs-table-body"></tbody>
-        </table>
-      </div>
+      <div class="panel-header"><h1>Access Logs</h1><span class="muted">Replay any decision in Security Lab</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Time</th><th>Subject</th><th>Request</th><th>Auth</th><th>Decision</th><th>Risk</th><th>Policy</th><th>Reason</th></tr></thead><tbody id="logs-table-body"></tbody></table></div>
     </section>
 
-    <section class="tab-panel hidden" data-panel="rotation">
-      <div class="panel-header">
-        <h1>Certificate Rotation</h1>
+    <section class="tab-panel hidden" data-panel="security">
+      <div class="panel-header"><div><h1>Security Lab</h1><p class="muted">Replay a decision or simulate a compromised identity without sending traffic to an upstream service.</p></div></div>
+      <div class="editor">
+        <h2>Decision Replay / Attack Simulator</h2>
+        <div class="form-grid">
+          <label class="full-width">Identity<input id="r-subject" type="text" /></label>
+          <label class="checkbox-label"><input id="r-authenticated" type="checkbox" /> Authenticated</label>
+          <label class="checkbox-label"><input id="r-posture" type="checkbox" /> Healthy device posture</label>
+          <label class="checkbox-label"><input id="r-cert" type="checkbox" /> Valid certificate</label>
+          <label class="checkbox-label"><input id="r-policy" type="checkbox" /> Policy allows request</label>
+          <label>Authentication<select id="r-method"><option value="mtls">mTLS / SPIFFE</option><option value="jwt">JWT fallback</option><option value="none">None</option></select></label>
+          <label class="checkbox-label"><input id="r-sensitive" type="checkbox" /> Sensitive resource</label>
+          <label>Recent denials<input id="r-denials" type="number" min="0" max="100" value="0" /></label>
+        </div>
+        <div class="editor-actions"><button id="security-run" class="primary">Run Simulation</button><button id="security-reset">Reset</button></div>
       </div>
-      <div id="rotation-status"></div>
+      <div id="security-result" class="card"><p class="muted">Configure the scenario and run it.</p></div>
     </section>
+
+    <section class="tab-panel hidden" data-panel="rotation"><div class="panel-header"><h1>Certificate Rotation</h1></div><div id="rotation-status"></div></section>
   </main>
-
   <script type="module" src="main.js"></script>
 </body>
 </html>
