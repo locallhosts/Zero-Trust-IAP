@@ -1,0 +1,13 @@
+{
+  "name": "iap-admin-ui",
+  "version": "1.0.0",
+  "description": "TypeScript admin UI for the Zero-Trust IAP: policy management, access logs, cert rotation status.",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node copy-assets.js",
+    "watch": "tsc -p tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

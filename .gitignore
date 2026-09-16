@@ -1,0 +1,8 @@
+/bin/
+/logs/*.log
+/logs/*.out
+/certs/out/
+/admin-ui/dist/
+/admin-ui/node_modules/
+*.tmp
+.DS_Store

@@ -1,0 +1,17 @@
+# Multi-stage build: compile the (dependency-free) Go proxy, then ship a
+# minimal runtime image. No external Go modules to fetch, so this builds
+# fine even in network-restricted CI.
+FROM golang:1.22-alpine AS build
+WORKDIR /src
+COPY go.mod ./
+COPY cmd ./cmd
+COPY internal ./internal
+RUN CGO_ENABLED=0 go build -o /out/proxy ./cmd/proxy
+RUN CGO_ENABLED=0 go build -o /out/posture-agent ./cmd/posture-agent
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+COPY --from=build /out/proxy /usr/local/bin/proxy
+COPY --from=build /out/posture-agent /usr/local/bin/posture-agent
+WORKDIR /etc/iap
+ENTRYPOINT ["/usr/local/bin/proxy"]

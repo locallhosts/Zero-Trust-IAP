@@ -1,0 +1,36 @@
+[
+  {
+    "id": "engineers-full-app-access",
+    "describe": "Engineering team workload identities get full access to the internal app, but only from devices with disk encryption and EDR active.",
+    "subjects": ["spiffe://iap.local/team/engineering/*"],
+    "path_prefixes": ["/"],
+    "methods": [],
+    "posture": {
+      "require_disk_encryption": true,
+      "require_edr": true,
+      "min_patch_level": "2026-06-01"
+    },
+    "enabled": true
+  },
+  {
+    "id": "contractors-read-only-dashboard",
+    "describe": "Contractor identities may only GET the read-only dashboard, and only with disk encryption on.",
+    "subjects": ["spiffe://iap.local/team/contractors/*"],
+    "path_prefixes": ["/dashboard"],
+    "methods": ["GET"],
+    "posture": {
+      "require_disk_encryption": true,
+      "require_edr": false
+    },
+    "enabled": true
+  },
+  {
+    "id": "admin-ui-jwt-users",
+    "describe": "Browser users authenticated via JWT (not mTLS) can reach the /api/status health endpoint only.",
+    "subjects": ["*"],
+    "path_prefixes": ["/api/status"],
+    "methods": ["GET"],
+    "posture": {},
+    "enabled": true
+  }
+]

@@ -1,0 +1,36 @@
+{
+  "listen_addr": ":8443",
+  "server_cert_file": "certs/out/proxy.crt",
+  "server_key_file": "certs/out/proxy.key",
+  "client_ca_file": "certs/out/ca.crt",
+
+  "trust_domains": ["iap.local"],
+  "max_svid_age": "1h",
+
+  "jwt_enabled": true,
+  "jwt_hmac_secret": "dev-only-change-me-set-via-IAP_JWT_SECRET-env-var",
+  "jwt_issuer": "iap-dev-issuer",
+  "jwt_audience": "iap-admin-ui",
+
+  "backend_url": "http://127.0.0.1:8081",
+
+  "policy_file": "configs/policy.example.json",
+
+  "vault_addr": "",
+  "vault_token": "",
+  "vault_pki_mount": "pki_int",
+  "vault_pki_role": "iap-workload",
+  "cert_ttl": "1h",
+  "rotation_enabled": false,
+  "rotation_check_interval": "5m",
+
+  "posture_enabled": true,
+  "posture_agent_url": "http://127.0.0.1:9443",
+  "posture_max_age": "10m",
+
+  "access_log_file": "logs/access.log",
+
+  "admin_listen_addr": "127.0.0.1:8444",
+  "admin_static_dir": "admin-ui/dist",
+  "admin_api_token": "dev-only-change-me-set-via-IAP_ADMIN_TOKEN-env-var"
+}

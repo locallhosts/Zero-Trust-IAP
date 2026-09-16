@@ -1,0 +1,104 @@
+# Reference deployment wiring the IAP proxy up to *real* SPIRE, Vault, and
+# an Envoy sidecar in front of a sample backend — this is what "graduating"
+# the project from the openssl-script demo (certs/generate-certs.sh) to
+# the actual architecture diagram in the README looks like.
+#
+# This compose file is intentionally NOT what you run for a five-minute
+# local demo (see scripts/dev-up.sh for that, using the Go binaries +
+# openssl certs directly). It's here so the repo has a credible path to
+# "how would this actually run," and so reviewers can see the SPIRE/Vault
+# configuration choices explicitly rather than hand-waved.
+#
+# Bring up: docker compose -f deploy/docker-compose.yml up
+#
+# NOTE: SPIRE registration entries and Vault PKI role setup still need a
+# one-time bootstrap — see deploy/README.md for the exact commands.
+version: "3.8"
+
+services:
+  spire-server:
+    image: ghcr.io/spiffe/spire-server:1.9.6
+    container_name: spire-server
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./spire/server.conf:/run/spire/config/server.conf:ro
+      - spire-server-data:/run/spire/data
+    command: ["-config", "/run/spire/config/server.conf"]
+    healthcheck:
+      test: ["CMD", "/opt/spire/bin/spire-server", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  spire-agent:
+    image: ghcr.io/spiffe/spire-agent:1.9.6
+    container_name: spire-agent
+    depends_on:
+      spire-server:
+        condition: service_healthy
+    volumes:
+      - ./spire/agent.conf:/run/spire/config/agent.conf:ro
+      - spire-agent-socket:/run/spire/sockets
+    command: ["-config", "/run/spire/config/agent.conf"]
+
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: vault
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_LOCAL_CONFIG: |
+        {
+          "listener": {"tcp": {"address": "0.0.0.0:8200", "tls_disable": true}},
+          "storage": {"file": {"path": "/vault/data"}},
+          "ui": true
+        }
+    volumes:
+      - vault-data:/vault/data
+      - ./vault:/vault/config-scripts:ro
+    command: ["server"]
+
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    container_name: envoy
+    depends_on:
+      - iap-proxy
+    ports:
+      - "10000:10000"
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    command: ["-c", "/etc/envoy/envoy.yaml"]
+
+  backend-app:
+    image: hashicorp/http-echo:latest
+    container_name: backend-app
+    command: ["-text=hello from the internal app, behind the IAP", "-listen=:5678"]
+
+  iap-proxy:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.proxy
+    container_name: iap-proxy
+    depends_on:
+      - vault
+      - backend-app
+    ports:
+      - "8443:8443"
+      - "8444:8444"
+    volumes:
+      - spire-agent-socket:/run/spire/sockets:ro
+      - ../configs:/etc/iap/configs:ro
+      - ../logs:/var/log/iap
+    environment:
+      VAULT_TOKEN: "${VAULT_TOKEN:-root}"
+      IAP_JWT_SECRET: "${IAP_JWT_SECRET:-change-me}"
+      IAP_ADMIN_TOKEN: "${IAP_ADMIN_TOKEN:-change-me}"
+    command: ["-config", "/etc/iap/configs/proxy.example.json"]
+
+volumes:
+  spire-server-data:
+  spire-agent-socket:
+  vault-data:
