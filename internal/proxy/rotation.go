@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"log"
 	"sync"
@@ -32,7 +33,7 @@ type Rotator struct {
 	commonName  string
 	spiffeURI   string
 
-	stop chan struct{}
+	stop       chan struct{}
 	generation int64
 }
 
@@ -41,10 +42,15 @@ func NewStaticRotator(certFile, keyFile string) (*Rotator, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Rotator{
-		current: &cert,
-		status:  RotationStatus{Source: "static-file", LastRotatedAt: time.Now()},
-	}, nil
+	status := RotationStatus{Source: "static-file", LastRotatedAt: time.Now()}
+	if len(cert.Certificate) > 0 {
+		leaf, err := x509.ParseCertificate(cert.Certificate[0])
+		if err == nil {
+			status.NotAfter = leaf.NotAfter
+			status.SerialNumber = leaf.SerialNumber.String()
+		}
+	}
+	return &Rotator{current: &cert, status: status}, nil
 }
 
 func NewVaultRotator(cfg *Config, vc *vault.Client, commonName, spiffeURI string) (*Rotator, error) {
