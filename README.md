@@ -386,7 +386,7 @@ The CI workflow runs the Go build/test/vet/format checks and the Admin UI build.
 
 ## What I'd harden next
 
-Being explicit about the gap between a portfolio/demo implementation and a production deployment is part of the project's security model:
+Being explicit about the gap between a  implementation and a production deployment is part of the project's security model:
 
 - **Posture agent trust:** the local demo posture endpoint uses plain local HTTP. Production needs signed posture reports bound to a device identity.
 - **SPIRE node attestation:** the reference deployment uses demo-friendly join-token attestation. Real fleets should use an appropriate hardware/cloud/Kubernetes attestation mechanism.
