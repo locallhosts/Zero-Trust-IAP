@@ -1,8 +1,7 @@
 // Package proxy implements the Identity-Aware Proxy's request path: every
-// inbound request is TLS-terminated, its client identity is verified
-// (mTLS/SPIFFE first, JWT as a fallback), device posture is checked, the
-// policy engine renders an allow/deny decision, the decision is logged,
-// and only on ALLOW is the request forwarded upstream.
+// inbound request is TLS-terminated, its client identity is verified,
+// device posture is checked, policy is evaluated, adaptive risk is scored,
+// and only an ALLOW reaches the upstream service.
 package proxy
 
 import (
@@ -21,10 +20,9 @@ import (
 	"zero-trust-iap/internal/logging"
 	"zero-trust-iap/internal/policy"
 	"zero-trust-iap/internal/posture"
+	"zero-trust-iap/internal/risk"
 )
 
-// Server wires together identity verification, posture checks, policy
-// evaluation, and forwarding into a single http.Handler.
 type Server struct {
 	cfg            *Config
 	spiffeVerifier *identity.Verifier
@@ -34,9 +32,10 @@ type Server struct {
 	accessLog      *logging.Logger
 	reverseProxy   *httputil.ReverseProxy
 	rotator        *Rotator
+	riskEngine     *risk.Engine
+	quarantine     *risk.QuarantineStore
 }
 
-// NewServer builds a Server from config and its collaborators.
 func NewServer(cfg *Config, policyEngine *policy.Engine, accessLog *logging.Logger, rotator *Rotator) (*Server, error) {
 	backend, err := url.Parse(cfg.BackendURL)
 	if err != nil {
@@ -45,11 +44,13 @@ func NewServer(cfg *Config, policyEngine *policy.Engine, accessLog *logging.Logg
 	rp := httputil.NewSingleHostReverseProxy(backend)
 
 	s := &Server{
-		cfg:          cfg,
-		policyEngine: policyEngine,
-		accessLog:    accessLog,
-		reverseProxy: rp,
-		rotator:      rotator,
+		cfg:            cfg,
+		policyEngine:   policyEngine,
+		accessLog:      accessLog,
+		reverseProxy:   rp,
+		rotator:        rotator,
+		riskEngine:     risk.NewEngine(),
+		quarantine:     risk.NewQuarantineStore(),
 	}
 
 	if cfg.TrustDomains != nil {
@@ -65,7 +66,6 @@ func NewServer(cfg *Config, policyEngine *policy.Engine, accessLog *logging.Logg
 	return s, nil
 }
 
-// authResult captures how a request authenticated, for logging/policy.
 type authResult struct {
 	subject    string
 	spiffeID   string
@@ -73,7 +73,6 @@ type authResult struct {
 }
 
 func (s *Server) authenticate(r *http.Request) (*authResult, error) {
-	// Preferred path: mTLS client certificate carrying a SPIFFE SVID.
 	if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 && s.spiffeVerifier != nil {
 		leaf := r.TLS.PeerCertificates[0]
 		vid, err := s.spiffeVerifier.Verify(leaf)
@@ -83,7 +82,6 @@ func (s *Server) authenticate(r *http.Request) (*authResult, error) {
 		return &authResult{subject: vid.SPIFFEID.String(), spiffeID: vid.SPIFFEID.String(), authMethod: "mtls"}, nil
 	}
 
-	// Fallback path: bearer JWT.
 	if s.jwtVerifier != nil {
 		authHeader := r.Header.Get("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
@@ -100,28 +98,28 @@ func (s *Server) authenticate(r *http.Request) (*authResult, error) {
 }
 
 var errNoCredentials = &authError{"no valid mTLS certificate or bearer JWT presented"}
-
 type authError struct{ msg string }
-
 func (e *authError) Error() string { return e.msg }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	ctx := r.Context()
 
-	// Strip any client-supplied identity headers immediately, before
-	// authentication or forwarding, so a client can never spoof the
-	// trusted identity headers the backend app relies on.
 	r.Header.Del("X-Forwarded-Identity")
 	r.Header.Del("X-Forwarded-Policy")
 
 	auth, err := s.authenticate(r)
 	if err != nil {
-		s.deny(w, r, "", "", "none", start, "authentication failed: "+err.Error(), "")
+		s.deny(w, r, "", "", "none", start, "authentication failed: "+err.Error(), "", risk.Result{Decision: risk.Deny})
 		return
 	}
 
-	// Device posture: fail closed if enabled and unreachable/stale.
+	if quarantined, reason := s.quarantine.IsQuarantined(auth.subject); quarantined {
+		s.deny(w, r, auth.subject, auth.spiffeID, auth.authMethod, start,
+			"identity is quarantined: "+reason, "", risk.Result{Decision: risk.Quarantine, Score: 100, Reasons: []string{"identity is currently quarantined"}})
+		return
+	}
+
 	postureFacts := policy.PostureFacts{}
 	postureOK := true
 	if s.postureClient != nil {
@@ -152,17 +150,38 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		PostureFacts: postureFacts,
 	})
 
-	if !decision.Allowed {
-		s.denyDecision(w, r, auth, start, decision)
+	riskResult := s.riskEngine.Evaluate(risk.Context{
+		Subject:           auth.subject,
+		Authenticated:     true,
+		PostureOK:         postureOK,
+		CertificateValid:  auth.authMethod != "mtls" || auth.spiffeID != "",
+		PolicyAllowed:     decision.Allowed,
+		AuthMethod:        auth.authMethod,
+		SensitiveResource: isSensitivePath(r.URL.Path),
+		RecentDenials:     s.recentDenials(auth.subject),
+	})
+
+	if riskResult.Decision == risk.Quarantine {
+		s.quarantine.Put(auth.subject, strings.Join(riskResult.Reasons, "; "), 15*time.Minute)
+		s.deny(w, r, auth.subject, auth.spiffeID, auth.authMethod, start,
+			"adaptive risk threshold exceeded; identity quarantined", decision.PolicyID, riskResult)
 		return
 	}
-	if s.postureClient != nil && !postureOK {
-		s.deny(w, r, auth.subject, auth.spiffeID, auth.authMethod, start,
-			"policy matched but device posture is missing or stale (failing closed)", decision.PolicyID)
+	if !decision.Allowed || riskResult.Decision == risk.Deny || riskResult.Decision == risk.StepUp {
+		reason := decision.Reason
+		if riskResult.Decision == risk.StepUp {
+			reason = "adaptive risk requires step-up authentication: " + strings.Join(riskResult.Reasons, "; ")
+		}
+		s.deny(w, r, auth.subject, auth.spiffeID, auth.authMethod, start, reason, decision.PolicyID, riskResult)
 		return
 	}
 
-	// ALLOW: attach trusted identity headers for the upstream app and forward.
+	if s.postureClient != nil && !postureOK {
+		s.deny(w, r, auth.subject, auth.spiffeID, auth.authMethod, start,
+			"policy matched but device posture is missing or stale (failing closed)", decision.PolicyID, riskResult)
+		return
+	}
+
 	r.Header.Set("X-Forwarded-Identity", auth.subject)
 	r.Header.Set("X-Forwarded-Policy", decision.PolicyID)
 
@@ -180,29 +199,50 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		PolicyID:   decision.PolicyID,
 		AuthMethod: auth.authMethod,
 		SPIFFEID:   auth.spiffeID,
+		RiskScore:  riskResult.Score,
+		RiskAction: string(riskResult.Decision),
+		RiskReasons: riskResult.Reasons,
 		LatencyMs:  time.Since(start).Milliseconds(),
 		StatusCode: rec.status,
 	})
 }
 
-func (s *Server) denyDecision(w http.ResponseWriter, r *http.Request, auth *authResult, start time.Time, d policy.Decision) {
-	s.deny(w, r, auth.subject, auth.spiffeID, auth.authMethod, start, d.Reason, d.PolicyID)
+func isSensitivePath(p string) bool {
+	for _, prefix := range []string{"/admin", "/secrets", "/vault", "/internal"} {
+		if p == prefix || strings.HasPrefix(p, prefix+"/") {
+			return true
+		}
+	}
+	return false
 }
 
-func (s *Server) deny(w http.ResponseWriter, r *http.Request, subject, spiffeID, authMethod string, start time.Time, reason, policyID string) {
+func (s *Server) recentDenials(subject string) int {
+	count := 0
+	for _, entry := range s.accessLog.Recent(20) {
+		if entry.Subject == subject && !entry.Allowed {
+			count++
+		}
+	}
+	return count
+}
+
+func (s *Server) deny(w http.ResponseWriter, r *http.Request, subject, spiffeID, authMethod string, start time.Time, reason, policyID string, riskResult risk.Result) {
 	s.accessLog.Log(logging.Entry{
-		Timestamp:  start,
-		Subject:    subject,
-		Method:     r.Method,
-		Path:       r.URL.Path,
-		RemoteAddr: r.RemoteAddr,
-		Allowed:    false,
-		Reason:     reason,
-		PolicyID:   policyID,
-		AuthMethod: authMethod,
-		SPIFFEID:   spiffeID,
-		LatencyMs:  time.Since(start).Milliseconds(),
-		StatusCode: http.StatusForbidden,
+		Timestamp:   start,
+		Subject:     subject,
+		Method:      r.Method,
+		Path:        r.URL.Path,
+		RemoteAddr:  r.RemoteAddr,
+		Allowed:     false,
+		Reason:      reason,
+		PolicyID:    policyID,
+		AuthMethod:  authMethod,
+		SPIFFEID:    spiffeID,
+		RiskScore:   riskResult.Score,
+		RiskAction:  string(riskResult.Decision),
+		RiskReasons: riskResult.Reasons,
+		LatencyMs:   time.Since(start).Milliseconds(),
+		StatusCode:  http.StatusForbidden,
 	})
 	http.Error(w, "access denied", http.StatusForbidden)
 }
@@ -211,17 +251,11 @@ type statusRecorder struct {
 	http.ResponseWriter
 	status int
 }
-
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
 }
 
-// BuildTLSConfig constructs the server-side tls.Config requiring (but not
-// yet fully verifying, beyond chain-of-trust) client certificates. Deep
-// SPIFFE ID validation happens per-request in authenticate() above, since
-// it needs to be logged/decisioned like any other policy check rather than
-// hard-failing the TLS handshake with no audit trail.
 func BuildTLSConfig(cfg *Config) (*tls.Config, error) {
 	cert, err := tls.LoadX509KeyPair(cfg.ServerCertFile, cfg.ServerKeyFile)
 	if err != nil {
@@ -239,7 +273,6 @@ func BuildTLSConfig(cfg *Config) (*tls.Config, error) {
 
 	clientAuth := tls.VerifyClientCertIfGiven
 	if !cfg.JWTEnabled {
-		// If JWT fallback is disabled, mTLS is mandatory.
 		clientAuth = tls.RequireAndVerifyClientCert
 	}
 
@@ -251,9 +284,6 @@ func BuildTLSConfig(cfg *Config) (*tls.Config, error) {
 	}, nil
 }
 
-// GetCertificate is used with tls.Config.GetCertificate so the server can
-// hot-swap its leaf certificate after Vault-driven rotation without
-// restarting the listener. See rotation.go.
 func (r *Rotator) GetCertificate(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return r.Current(), nil
 }
