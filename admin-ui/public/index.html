@@ -11,7 +11,7 @@
   <div class="brand"><span class="brand-mark">◆</span><span>Zero-Trust IAP</span><span class="brand-sub">Admin Console</span></div>
   <div class="token-bar">
     <label for="admin-token-input">Admin token</label>
-    <input id="admin-token-input" type="password" placeholder="X-Admin-Token" />
+    <input id="admin-token-input" type="password" placeholder="Enter admin token" />
     <button id="admin-token-save">Save</button>
     <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark theme">Dark</button>
   </div>
@@ -92,7 +92,25 @@
   <section class="tab-panel hidden" data-panel="policies">
     <div class="panel-header"><h1>Access Policies</h1><button id="new-policy-btn" class="primary">+ New Policy</button></div>
     <div id="policies-list" class="cards-grid"></div>
-    <div id="policy-editor" class="editor hidden"><h2>Edit Policy</h2><div class="form-grid"><label>ID<input id="f-id" type="text" /></label><label class="checkbox-label"><input id="f-enabled" type="checkbox" /> Enabled</label><label class="full-width">Description<textarea id="f-describe" rows="2"></textarea></label><label class="full-width">Subjects<textarea id="f-subjects" rows="3"></textarea></label><label class="full-width">Path prefixes<textarea id="f-paths" rows="2"></textarea></label><label class="full-width">Methods<input id="f-methods" type="text" /></label><fieldset class="full-width posture-fields"><legend>Required device posture</legend><label class="checkbox-label"><input id="f-disk" type="checkbox" /> Disk encryption</label><label class="checkbox-label"><input id="f-edr" type="checkbox" /> EDR running</label><label>Min patch level<input id="f-patch" type="text" /></label></fieldset></div><div class="editor-actions"><button id="editor-save" class="primary">Save Policy</button><button id="editor-cancel">Cancel</button></div></div>
+    <div id="policy-editor" class="editor hidden">
+      <h2>Create or Edit Policy</h2>
+      <p class="muted">Define who can access which resources, methods and device conditions.</p>
+      <div class="form-grid">
+        <label>ID<input id="f-id" type="text" placeholder="e.g. engineers-full-app-access" autocomplete="off" /></label>
+        <label class="checkbox-label"><input id="f-enabled" type="checkbox" /> Enabled</label>
+        <label class="full-width">Description<textarea id="f-describe" rows="2" placeholder="Explain what this policy allows and under which conditions."></textarea></label>
+        <label class="full-width">Subjects<textarea id="f-subjects" rows="3" placeholder="spiffe://iap.local/team/engineering/*&#10;spiffe://iap.local/team/security/*"></textarea></label>
+        <label class="full-width">Path prefixes<textarea id="f-paths" rows="2" placeholder="/&#10;/dashboard&#10;/api/status"></textarea></label>
+        <label class="full-width">Methods<input id="f-methods" type="text" placeholder="GET, POST (leave empty for any method)" /></label>
+        <fieldset class="full-width posture-fields">
+          <legend>Required device posture</legend>
+          <label class="checkbox-label"><input id="f-disk" type="checkbox" /> Disk encryption</label>
+          <label class="checkbox-label"><input id="f-edr" type="checkbox" /> EDR running</label>
+          <label>Min patch level<input id="f-patch" type="text" placeholder="e.g. 2026-06-01" /></label>
+        </fieldset>
+      </div>
+      <div class="editor-actions"><button id="editor-save" class="primary">Save Policy</button><button id="editor-cancel">Cancel</button></div>
+    </div>
   </section>
 
   <section class="tab-panel hidden" data-panel="logs">
@@ -102,7 +120,7 @@
 
   <section class="tab-panel hidden" data-panel="security">
     <div class="panel-header"><div><h1>Security Lab</h1><p class="muted">Replay a decision or simulate a compromised identity without sending traffic upstream.</p></div></div>
-    <div class="editor"><h2>Decision Replay / Attack Simulator</h2><div class="form-grid"><label class="full-width">Identity<input id="r-subject" type="text" /></label><label class="checkbox-label"><input id="r-authenticated" type="checkbox" /> Authenticated</label><label class="checkbox-label"><input id="r-posture" type="checkbox" /> Healthy device posture</label><label class="checkbox-label"><input id="r-cert" type="checkbox" /> Valid certificate</label><label class="checkbox-label"><input id="r-policy" type="checkbox" /> Policy allows request</label><label>Authentication<select id="r-method"><option value="mtls">mTLS / SPIFFE</option><option value="jwt">JWT fallback</option><option value="none">None</option></select></label><label class="checkbox-label"><input id="r-sensitive" type="checkbox" /> Sensitive resource</label><label>Recent denials<input id="r-denials" type="number" min="0" max="100" value="0" /></label></div><div class="editor-actions"><button id="security-run" class="primary">Run Simulation</button><button id="security-reset">Reset</button></div></div>
+    <div class="editor"><h2>Decision Replay / Attack Simulator</h2><div class="form-grid"><label class="full-width">Identity<input id="r-subject" type="text" placeholder="spiffe://iap.local/user/demo" /></label><label class="checkbox-label"><input id="r-authenticated" type="checkbox" /> Authenticated</label><label class="checkbox-label"><input id="r-posture" type="checkbox" /> Healthy device posture</label><label class="checkbox-label"><input id="r-cert" type="checkbox" /> Valid certificate</label><label class="checkbox-label"><input id="r-policy" type="checkbox" /> Policy allows request</label><label>Authentication<select id="r-method"><option value="mtls">mTLS / SPIFFE</option><option value="jwt">JWT fallback</option><option value="none">None</option></select></label><label class="checkbox-label"><input id="r-sensitive" type="checkbox" /> Sensitive resource</label><label>Recent denials<input id="r-denials" type="number" min="0" max="100" value="0" placeholder="0" /></label></div><div class="editor-actions"><button id="security-run" class="primary">Run Simulation</button><button id="security-reset">Reset</button></div></div>
     <div id="security-result" class="card"><p class="muted">Configure the scenario and run it.</p></div>
   </section>
 
