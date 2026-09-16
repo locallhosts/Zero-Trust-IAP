@@ -1,9 +1,7 @@
 // Package admin exposes a small JSON REST API backing the TypeScript admin
-// UI: policy management, live-ish access logs, and certificate rotation
-// status. It's deliberately served on a *separate* listener/port from the
-// data-plane proxy (see cmd/proxy/main.go) — mixing control-plane admin
-// endpoints into the same listener that handles untrusted end-user traffic
-// is a common way IAPs/VPN concentrators get compromised, so we don't.
+// UI: policy management, live-ish access logs, certificate rotation status,
+// and security decision replay/simulation. It is deliberately served on a
+// separate listener from the data-plane proxy.
 package admin
 
 import (
@@ -14,12 +12,14 @@ import (
 	"zero-trust-iap/internal/logging"
 	"zero-trust-iap/internal/policy"
 	"zero-trust-iap/internal/proxy"
+	"zero-trust-iap/internal/risk"
 )
 
 type API struct {
 	policyEngine *policy.Engine
 	accessLog    *logging.Logger
 	rotator      *proxy.Rotator
+	riskEngine   *risk.Engine
 	adminToken   string
 	mux          *http.ServeMux
 }
@@ -29,6 +29,7 @@ func NewAPI(policyEngine *policy.Engine, accessLog *logging.Logger, rotator *pro
 		policyEngine: policyEngine,
 		accessLog:    accessLog,
 		rotator:      rotator,
+		riskEngine:   risk.NewEngine(),
 		adminToken:   adminToken,
 		mux:          http.NewServeMux(),
 	}
@@ -40,6 +41,7 @@ func (a *API) routes() {
 	a.mux.HandleFunc("/api/policies", a.requireAuth(a.handlePolicies))
 	a.mux.HandleFunc("/api/policies/", a.requireAuth(a.handlePolicyByID))
 	a.mux.HandleFunc("/api/logs", a.requireAuth(a.handleLogs))
+	a.mux.HandleFunc("/api/security/replay", a.requireAuth(a.handleSecurityReplay))
 	a.mux.HandleFunc("/api/rotation/status", a.requireAuth(a.handleRotationStatus))
 	a.mux.HandleFunc("/api/rotation/rotate-now", a.requireAuth(a.handleRotateNow))
 	a.mux.HandleFunc("/healthz", a.handleHealthz)
@@ -53,8 +55,6 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (a *API) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if a.adminToken == "" {
-			// No token configured (local dev) — allow, but this should
-			// never happen in a deployed config; main.go warns loudly.
 			next(w, r)
 			return
 		}
@@ -143,6 +143,50 @@ func (a *API) handleLogs(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(a.accessLog.Recent(limit))
 }
 
+// SecurityReplayRequest contains the exact signal classes consumed by the
+// adaptive risk engine. The endpoint accepts facts rather than executing a
+// live request, so historical decisions and hypothetical attacks can be
+// replayed safely without touching a protected upstream service.
+type SecurityReplayRequest struct {
+	Subject           string `json:"subject"`
+	Authenticated     bool   `json:"authenticated"`
+	PostureOK         bool   `json:"posture_ok"`
+	CertificateValid  bool   `json:"certificate_valid"`
+	PolicyAllowed     bool   `json:"policy_allowed"`
+	AuthMethod        string `json:"auth_method"`
+	SensitiveResource bool   `json:"sensitive_resource"`
+	RecentDenials     int    `json:"recent_denials"`
+}
+
+func (a *API) handleSecurityReplay(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req SecurityReplayRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.AuthMethod == "" {
+		req.AuthMethod = "mtls"
+	}
+	result := a.riskEngine.Evaluate(risk.Context{
+		Subject:           req.Subject,
+		Authenticated:     req.Authenticated,
+		PostureOK:         req.PostureOK,
+		CertificateValid:  req.CertificateValid,
+		PolicyAllowed:     req.PolicyAllowed,
+		AuthMethod:        req.AuthMethod,
+		SensitiveResource: req.SensitiveResource,
+		RecentDenials:     req.RecentDenials,
+	})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"input":  req,
+		"result": result,
+	})
+}
+
 func (a *API) handleRotationStatus(w http.ResponseWriter, r *http.Request) {
 	if a.rotator == nil {
 		_ = json.NewEncoder(w).Encode(map[string]string{"source": "disabled"})
@@ -160,9 +204,6 @@ func (a *API) handleRotateNow(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "rotation is not enabled on this proxy")
 		return
 	}
-	// Rotation itself runs on the proxy's Rotator; here we just report
-	// current status since forcing an out-of-band rotation is done via
-	// the same Rotator instance shared with the proxy server.
 	_ = json.NewEncoder(w).Encode(a.rotator.Status())
 }
 
