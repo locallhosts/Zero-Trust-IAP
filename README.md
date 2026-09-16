@@ -266,9 +266,21 @@ A useful end-to-end demonstration is:
 9. Open **Cert Rotation** to inspect the active certificate lifecycle.
 10. Switch the Dashboard between light and dark mode if you want to demonstrate the UI preference persistence.
 
-## Demo assets
+## Demo
 
-The repository includes captured screenshots and short GIF demonstrations of the local Zero Trust workflow.
+The repository includes a visual walkthrough of the local Zero Trust enforcement flow. The GIFs below are embedded directly so they render as animated previews on the GitHub README.
+
+### Zero Trust Request Flow
+
+![Zero Trust Request Flow](docs/demo/videos/01-zero-trust-request-flow.gif)
+
+### Adaptive Risk and Quarantine
+
+![Adaptive Risk and Quarantine](docs/demo/videos/02-adaptive-risk-and-quarantine.gif)
+
+### Security Lab Policy Replay
+
+![Security Lab Policy Replay](docs/demo/videos/03-security-lab-policy-replay.gif)
 
 ### Screenshots
 
@@ -279,12 +291,6 @@ The repository includes captured screenshots and short GIF demonstrations of the
 - [Access Logs](docs/demo/screenshots/05-access-logs.png)
 - [Certificate Rotation](docs/demo/screenshots/06-certificate-rotation.png)
 - [Protected Dashboard](docs/demo/screenshots/07-protected-dashboard.png)
-
-### Videos / GIFs
-
-- [Zero Trust Request Flow](docs/demo/videos/01-zero-trust-request-flow.gif)
-- [Adaptive Risk and Quarantine](docs/demo/videos/02-adaptive-risk-and-quarantine.gif)
-- [Security Lab Policy Replay](docs/demo/videos/03-security-lab-policy-replay.gif)
 
 These assets provide a visual walkthrough of identity verification, mTLS enforcement, adaptive risk decisions, policy replay, access logging, certificate lifecycle information and the protected upstream application.
 
