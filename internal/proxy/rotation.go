@@ -22,10 +22,6 @@ type RotationStatus struct {
 	Source        string    `json:"source"` // "vault" | "static-file"
 }
 
-// Rotator holds the currently active TLS certificate and, if configured,
-// periodically replaces it with a freshly Vault-issued one before it
-// expires — this is the "secret rotation without hardcoded credentials"
-// requirement from the project brief.
 type Rotator struct {
 	mu      sync.RWMutex
 	current *tls.Certificate
@@ -37,13 +33,9 @@ type Rotator struct {
 	spiffeURI   string
 
 	stop chan struct{}
-	// generation lets callers detect that a rotation happened, useful in tests.
 	generation int64
 }
 
-// NewStaticRotator wraps a fixed cert/key pair with no rotation — used
-// when Vault rotation is disabled (e.g. local dev with openssl-generated
-// certs from scripts/generate-certs.sh).
 func NewStaticRotator(certFile, keyFile string) (*Rotator, error) {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
@@ -55,9 +47,6 @@ func NewStaticRotator(certFile, keyFile string) (*Rotator, error) {
 	}, nil
 }
 
-// NewVaultRotator builds a Rotator that mints its first cert from Vault
-// immediately and then re-issues on cfg.RotationCheck interval, replacing
-// the cert whenever less than 20% of its TTL remains.
 func NewVaultRotator(cfg *Config, vc *vault.Client, commonName, spiffeURI string) (*Rotator, error) {
 	r := &Rotator{
 		vaultClient: vc,
@@ -73,19 +62,27 @@ func NewVaultRotator(cfg *Config, vc *vault.Client, commonName, spiffeURI string
 	return r, nil
 }
 
-// Current returns the currently active certificate for use in
-// tls.Config.GetCertificate.
 func (r *Rotator) Current() *tls.Certificate {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.current
 }
 
-// Status returns a snapshot of rotation health for the admin API.
 func (r *Rotator) Status() RotationStatus {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.status
+}
+
+// RotateNow performs a real Vault certificate replacement. Static-file mode
+// deliberately refuses rotation because replacing a leaf without its issuing
+// CA would break existing client trust; use the Vault deployment for live
+// operator-driven rotation.
+func (r *Rotator) RotateNow(ctx context.Context) error {
+	if r.vaultClient == nil {
+		return fmt.Errorf("manual rotation is unavailable for static-file certificates; configure Vault PKI for live rotation")
+	}
+	return r.rotateOnce(ctx)
 }
 
 func (r *Rotator) rotateOnce(ctx context.Context) error {
@@ -114,8 +111,6 @@ func (r *Rotator) rotateOnce(ctx context.Context) error {
 	return nil
 }
 
-// Run starts the background rotation loop. Call in a goroutine; stop via
-// Close(). No-op for static (non-Vault) rotators.
 func (r *Rotator) Run(ctx context.Context) {
 	if r.vaultClient == nil {
 		return

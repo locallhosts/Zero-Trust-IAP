@@ -11,9 +11,10 @@ import (
 	"time"
 )
 
-// Entry is one access decision record.
+// Entry is one access decision or control-plane audit record.
 type Entry struct {
 	Timestamp   time.Time `json:"timestamp"`
+	Source      string    `json:"source,omitempty"` // "LIVE" | "SIMULATION" | "SYSTEM"
 	Subject     string    `json:"subject"`
 	Method      string    `json:"method"`
 	Path        string    `json:"path"`
@@ -55,6 +56,9 @@ func NewLogger(path string, ringCapacity int) (*Logger, error) {
 func (l *Logger) Log(e Entry) {
 	if e.Timestamp.IsZero() {
 		e.Timestamp = time.Now()
+	}
+	if e.Source == "" {
+		e.Source = "LIVE"
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
