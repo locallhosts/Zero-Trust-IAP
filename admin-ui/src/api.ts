@@ -1,4 +1,11 @@
-import type { Policy, AccessLogEntry, RotationStatus, ApiError } from "./types.js";
+import type {
+  Policy,
+  AccessLogEntry,
+  RotationStatus,
+  ApiError,
+  SecurityReplayRequest,
+  SecurityReplayResponse,
+} from "./types.js";
 
 const TOKEN_STORAGE_KEY = "iap_admin_token";
 
@@ -11,9 +18,6 @@ export function setStoredToken(token: string): void {
 }
 
 class ApiClient {
-  // The admin UI is served by the same Go binary's admin listener, so
-  // relative paths are correct both in local dev (served straight from
-  // admin-ui/dist via `go run ./cmd/proxy`) and in any real deployment.
   private base = "";
 
   private headers(): HeadersInit {
@@ -63,6 +67,15 @@ class ApiClient {
   async recentLogs(limit = 100): Promise<AccessLogEntry[]> {
     const res = await fetch(`${this.base}/api/logs?limit=${limit}`, { headers: this.headers() });
     return this.handle<AccessLogEntry[]>(res);
+  }
+
+  async replaySecurity(request: SecurityReplayRequest): Promise<SecurityReplayResponse> {
+    const res = await fetch(`${this.base}/api/security/replay`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(request),
+    });
+    return this.handle<SecurityReplayResponse>(res);
   }
 
   async rotationStatus(): Promise<RotationStatus> {
