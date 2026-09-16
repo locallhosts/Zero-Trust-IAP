@@ -4,6 +4,7 @@ build:
 	go build -o bin/proxy ./cmd/proxy
 	go build -o bin/posture-agent ./cmd/posture-agent
 	go build -o bin/mint-jwt ./cmd/mint-jwt
+	go build -o bin/demo-app ./cmd/demo-app
 
 test:
 	go test ./...
