@@ -1,8 +1,4 @@
-// Types mirroring the Go structs served by internal/admin/api.go. Kept
-// hand-in-sync with the backend rather than code-generated, since the
-// surface is small and stable; see internal/policy/policy.go,
-// internal/logging/access_log.go, and internal/proxy/rotation.go for the
-// source of truth.
+// Types mirroring the Go structs served by the admin API.
 
 export interface PostureRequirement {
   require_disk_encryption?: boolean;
@@ -31,6 +27,9 @@ export interface AccessLogEntry {
   policy_id?: string;
   auth_method: "mtls" | "jwt" | "none";
   spiffe_id?: string;
+  risk_score?: number;
+  risk_action?: string;
+  risk_reasons?: string[];
   latency_ms: number;
   status_code?: number;
 }
@@ -41,6 +40,28 @@ export interface RotationStatus {
   serial_number?: string;
   last_error?: string;
   source: "vault" | "static-file" | "disabled";
+}
+
+export interface SecurityReplayRequest {
+  subject: string;
+  authenticated: boolean;
+  posture_ok: boolean;
+  certificate_valid: boolean;
+  policy_allowed: boolean;
+  auth_method: "mtls" | "jwt" | "none";
+  sensitive_resource: boolean;
+  recent_denials: number;
+}
+
+export interface RiskResult {
+  score: number;
+  decision: "ALLOW" | "STEP_UP" | "DENY" | "QUARANTINE";
+  reasons: string[];
+}
+
+export interface SecurityReplayResponse {
+  input: SecurityReplayRequest;
+  result: RiskResult;
 }
 
 export interface ApiError {
