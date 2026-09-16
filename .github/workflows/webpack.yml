@@ -13,49 +13,44 @@ jobs:
   test:
     name: Go tests and checks
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.22.x"
           cache: false
-
       - name: Build Go binaries
         run: make build
-
       - name: Run Go tests
         run: make test
-
       - name: Run go vet
         run: make vet
-
       - name: Check formatting
         run: |
-          test -z "$(gofmt -l .)"
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "The following Go files are not gofmt-formatted:"
+            printf '%s\n' "$files"
+            exit 1
+          fi
 
   admin-ui:
     name: Admin UI build
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22.x"
           cache: npm
           cache-dependency-path: admin-ui/package-lock.json
-
       - name: Install admin UI dependencies
         working-directory: admin-ui
         run: npm ci
-
       - name: Build admin UI
         working-directory: admin-ui
         run: npm run build
