@@ -4,11 +4,14 @@ import type { Policy, AccessLogEntry, RotationStatus, SecurityReplayRequest } fr
 type Tab = "policies" | "logs" | "security" | "rotation";
 let activeTab: Tab = "policies";
 let pollHandle: number | undefined;
+const THEME_KEY = "iap_admin_theme";
 
 function $(id: string): HTMLElement { const el = document.getElementById(id); if (!el) throw new Error(`missing element #${id}`); return el; }
 function escapeHtml(s: string): string { const div = document.createElement("div"); div.textContent = s; return div.innerHTML; }
 function fmtTime(iso?: string): string { if (!iso) return "—"; const d = new Date(iso); return isNaN(d.getTime()) ? "—" : d.toLocaleString(); }
 
+function applyTheme(theme: "dark" | "light"): void { document.documentElement.dataset.theme = theme; localStorage.setItem(THEME_KEY, theme); const button = $("theme-toggle"); button.textContent = theme === "dark" ? "Light" : "Dark"; button.setAttribute("aria-label", `Switch to ${theme === "dark" ? "light" : "dark"} theme`); }
+function initTheme(): void { const saved = localStorage.getItem(THEME_KEY); const theme = saved === "light" || saved === "dark" ? saved : "dark"; applyTheme(theme); $("theme-toggle").addEventListener("click", () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark")); }
 function initTokenBar(): void { const input = $("admin-token-input") as HTMLInputElement; input.value = getStoredToken(); $("admin-token-save").addEventListener("click", () => { setStoredToken(input.value.trim()); refreshActiveTab(); }); }
 function initTabs(): void { document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(btn => btn.addEventListener("click", () => setActiveTab(btn.dataset.tab as Tab))); }
 function setActiveTab(tab: Tab): void { activeTab = tab; document.querySelectorAll<HTMLElement>(".tab-panel").forEach(p => p.classList.toggle("hidden", p.dataset.panel !== tab)); document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab)); refreshActiveTab(); }
@@ -36,5 +39,5 @@ function initSecurity(): void { fillReplayForm(defaultReplay()); $("security-res
 async function renderRotation(): Promise<void> { const c = $("rotation-status"); const b = $("rotate-now") as HTMLButtonElement; try { const s: RotationStatus = await api.rotationStatus(); const healthy = s.source !== "disabled" && !s.last_error; c.innerHTML = `<div class="card ${healthy ? "" : "disabled"}"><div class="card-header"><span class="policy-id">Certificate Rotation</span><span class="badge ${healthy ? "badge-on" : "badge-off"}">${escapeHtml(s.source)}</span></div><dl class="policy-meta"><dt>Last rotated</dt><dd>${fmtTime(s.last_rotated_at)}</dd><dt>Expires</dt><dd>${fmtTime(s.not_after)}</dd><dt>Serial</dt><dd>${escapeHtml(s.serial_number || "—")}</dd>${s.last_error ? `<dt>Last error</dt><dd class="error">${escapeHtml(s.last_error)}</dd>` : ""}</dl>${s.source === "static-file" ? `<p class="muted">Static demo certificate. Live Rotate Now requires Vault PKI.</p>` : ""}</div>`; b.disabled = s.source !== "vault"; b.title = s.source === "vault" ? "Rotate the active certificate now" : "Configure Vault PKI for live rotation"; } catch (e) { c.innerHTML = `<p class="error">Failed to load rotation status: ${escapeHtml((e as Error).message)}</p>`; } }
 function initRotation(): void { $("rotate-now").addEventListener("click", async () => { const b = $("rotate-now") as HTMLButtonElement; b.disabled = true; b.textContent = "Rotating…"; try { await api.rotateNow(); await renderRotation(); await renderLogs(); } catch (e) { alert(`Rotation failed: ${(e as Error).message}`); await renderRotation(); } finally { b.textContent = "Rotate Now"; } }); }
 function startPolling(): void { if (pollHandle) window.clearInterval(pollHandle); pollHandle = window.setInterval(() => refreshActiveTab(), 5000); }
-function main(): void { initTokenBar(); initTabs(); initPolicyEditor(); initSecurity(); initRotation(); setActiveTab("policies"); startPolling(); }
+function main(): void { initTheme(); initTokenBar(); initTabs(); initPolicyEditor(); initSecurity(); initRotation(); setActiveTab("policies"); startPolling(); }
 document.addEventListener("DOMContentLoaded", main);
