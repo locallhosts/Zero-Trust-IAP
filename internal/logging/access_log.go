@@ -13,21 +13,21 @@ import (
 
 // Entry is one access decision record.
 type Entry struct {
-	Timestamp  time.Time `json:"timestamp"`
-	Subject    string    `json:"subject"`
-	Method     string    `json:"method"`
-	Path       string    `json:"path"`
-	RemoteAddr string    `json:"remote_addr"`
-	Allowed    bool      `json:"allowed"`
-	Reason     string    `json:"reason"`
-	PolicyID   string    `json:"policy_id,omitempty"`
-	AuthMethod string    `json:"auth_method"`
-	SPIFFEID   string    `json:"spiffe_id,omitempty"`
-	RiskScore  int       `json:"risk_score,omitempty"`
-	RiskAction string    `json:"risk_action,omitempty"`
+	Timestamp   time.Time `json:"timestamp"`
+	Subject     string    `json:"subject"`
+	Method      string    `json:"method"`
+	Path        string    `json:"path"`
+	RemoteAddr  string    `json:"remote_addr"`
+	Allowed     bool      `json:"allowed"`
+	Reason      string    `json:"reason"`
+	PolicyID    string    `json:"policy_id,omitempty"`
+	AuthMethod  string    `json:"auth_method"`
+	SPIFFEID    string    `json:"spiffe_id,omitempty"`
+	RiskScore   int       `json:"risk_score,omitempty"`
+	RiskAction  string    `json:"risk_action,omitempty"`
 	RiskReasons []string  `json:"risk_reasons,omitempty"`
-	LatencyMs  int64     `json:"latency_ms"`
-	StatusCode int       `json:"status_code,omitempty"`
+	LatencyMs   int64     `json:"latency_ms"`
+	StatusCode  int       `json:"status_code,omitempty"`
 }
 
 // Logger writes structured JSON-lines and keeps a bounded in-memory ring

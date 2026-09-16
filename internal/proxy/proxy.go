@@ -44,13 +44,13 @@ func NewServer(cfg *Config, policyEngine *policy.Engine, accessLog *logging.Logg
 	rp := httputil.NewSingleHostReverseProxy(backend)
 
 	s := &Server{
-		cfg:            cfg,
-		policyEngine:   policyEngine,
-		accessLog:      accessLog,
-		reverseProxy:   rp,
-		rotator:        rotator,
-		riskEngine:     risk.NewEngine(),
-		quarantine:     risk.NewQuarantineStore(),
+		cfg:          cfg,
+		policyEngine: policyEngine,
+		accessLog:    accessLog,
+		reverseProxy: rp,
+		rotator:      rotator,
+		riskEngine:   risk.NewEngine(),
+		quarantine:   risk.NewQuarantineStore(),
 	}
 
 	if cfg.TrustDomains != nil {
@@ -98,7 +98,9 @@ func (s *Server) authenticate(r *http.Request) (*authResult, error) {
 }
 
 var errNoCredentials = &authError{"no valid mTLS certificate or bearer JWT presented"}
+
 type authError struct{ msg string }
+
 func (e *authError) Error() string { return e.msg }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -189,21 +191,21 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.reverseProxy.ServeHTTP(rec, r)
 
 	s.accessLog.Log(logging.Entry{
-		Timestamp:  start,
-		Subject:    auth.subject,
-		Method:     r.Method,
-		Path:       r.URL.Path,
-		RemoteAddr: r.RemoteAddr,
-		Allowed:    true,
-		Reason:     decision.Reason,
-		PolicyID:   decision.PolicyID,
-		AuthMethod: auth.authMethod,
-		SPIFFEID:   auth.spiffeID,
-		RiskScore:  riskResult.Score,
-		RiskAction: string(riskResult.Decision),
+		Timestamp:   start,
+		Subject:     auth.subject,
+		Method:      r.Method,
+		Path:        r.URL.Path,
+		RemoteAddr:  r.RemoteAddr,
+		Allowed:     true,
+		Reason:      decision.Reason,
+		PolicyID:    decision.PolicyID,
+		AuthMethod:  auth.authMethod,
+		SPIFFEID:    auth.spiffeID,
+		RiskScore:   riskResult.Score,
+		RiskAction:  string(riskResult.Decision),
 		RiskReasons: riskResult.Reasons,
-		LatencyMs:  time.Since(start).Milliseconds(),
-		StatusCode: rec.status,
+		LatencyMs:   time.Since(start).Milliseconds(),
+		StatusCode:  rec.status,
 	})
 }
 
@@ -251,6 +253,7 @@ type statusRecorder struct {
 	http.ResponseWriter
 	status int
 }
+
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
