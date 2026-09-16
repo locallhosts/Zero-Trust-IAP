@@ -1,28 +1,61 @@
-name: NodeJS with Webpack
+name: Zero-Trust IAP CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  test:
+    name: Go tests and checks
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache: false
+
+      - name: Build Go binaries
+        run: make build
+
+      - name: Run Go tests
+        run: make test
+
+      - name: Run go vet
+        run: make vet
+
+      - name: Check formatting
+        run: |
+          test -z "$(gofmt -l .)"
+
+  admin-ui:
+    name: Admin UI build
+    runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: admin-ui/package-lock.json
 
-    - name: Build
-      run: |
-        npm install
-        npx webpack
+      - name: Install admin UI dependencies
+        working-directory: admin-ui
+        run: npm ci
+
+      - name: Build admin UI
+        working-directory: admin-ui
+        run: npm run build
