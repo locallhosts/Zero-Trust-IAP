@@ -94,6 +94,9 @@ func (l *Logger) Recent(limit int) []Entry {
 	if limit > 0 && limit < len(all) {
 		all = all[:limit]
 	}
+	if all == nil {
+		return []Entry{}
+	}
 	return all
 }
 
