@@ -1,13 +1,116 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Zero-Trust IAP — Admin</title><link rel="stylesheet" href="styles.css" /></head>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zero-Trust IAP — Admin</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
 <body>
-<header class="topbar"><div class="brand"><span class="brand-mark">◆</span><span>Zero-Trust IAP</span><span class="brand-sub">Admin Console</span></div><div class="token-bar"><label for="admin-token-input">Admin token</label><input id="admin-token-input" type="password" placeholder="X-Admin-Token" /><button id="admin-token-save">Save</button><button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light and dark theme">Light</button></div></header>
-<nav class="tabs"><button data-tab="policies" class="active">Policies</button><button data-tab="logs">Access Logs</button><button data-tab="security">Security Lab</button><button data-tab="rotation">Cert Rotation</button></nav>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">◆</span><span>Zero-Trust IAP</span><span class="brand-sub">Admin Console</span></div>
+  <div class="token-bar">
+    <label for="admin-token-input">Admin token</label>
+    <input id="admin-token-input" type="password" placeholder="X-Admin-Token" />
+    <button id="admin-token-save">Save</button>
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark theme">Dark</button>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Admin console navigation">
+  <button data-tab="dashboard" class="active">Dashboard</button>
+  <button data-tab="policies">Policies</button>
+  <button data-tab="logs">Access Logs</button>
+  <button data-tab="security">Security Lab</button>
+  <button data-tab="rotation">Cert Rotation</button>
+</nav>
+
 <main>
-<section class="intro card"><div><span class="eyebrow">Zero Trust operations console</span><h1>Security dashboard</h1><p class="intro-lead">Manage policies, inspect live access decisions, replay risk scenarios and monitor certificate lifecycle from one local control plane.</p></div><div class="intro-grid"><div><strong>How to use</strong><ol><li>Enter the admin token and select <b>Save</b>.</li><li>Use <b>Policies</b> to review or edit access rules.</li><li>Use <b>Access Logs</b> to inspect LIVE, SIMULATION and SYSTEM events.</li><li>Use <b>Security Lab</b> to replay deterministic risk scenarios.</li><li>Use <b>Cert Rotation</b> to inspect lifecycle status and rotate when Vault PKI is configured.</li></ol></div><div><strong>Protected application</strong><p class="muted">The demo upstream is available through the IAP at <code>https://localhost:8443/dashboard</code>. The Admin Console itself runs on <code>http://127.0.0.1:8444</code>.</p></div></div></section>
-<section class="tab-panel" data-panel="policies"><div class="panel-header"><h1>Access Policies</h1><button id="new-policy-btn" class="primary">+ New Policy</button></div><div id="policies-list" class="cards-grid"></div><div id="policy-editor" class="editor hidden"><h2>Edit Policy</h2><div class="form-grid"><label>ID<input id="f-id" type="text" /></label><label class="checkbox-label"><input id="f-enabled" type="checkbox" /> Enabled</label><label class="full-width">Description<textarea id="f-describe" rows="2"></textarea></label><label class="full-width">Subjects<textarea id="f-subjects" rows="3"></textarea></label><label class="full-width">Path prefixes<textarea id="f-paths" rows="2"></textarea></label><label class="full-width">Methods<input id="f-methods" type="text" /></label><fieldset class="full-width posture-fields"><legend>Required device posture</legend><label class="checkbox-label"><input id="f-disk" type="checkbox" /> Disk encryption</label><label class="checkbox-label"><input id="f-edr" type="checkbox" /> EDR running</label><label>Min patch level<input id="f-patch" type="text" /></label></fieldset></div><div class="editor-actions"><button id="editor-save" class="primary">Save Policy</button><button id="editor-cancel">Cancel</button></div></div></section>
-<section class="tab-panel hidden" data-panel="logs"><div class="panel-header"><div><h1>Access Logs</h1><span class="muted">Live requests, Security Lab simulations and system events</span></div></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Source</th><th>Subject</th><th>Request</th><th>Auth</th><th>Decision</th><th>Risk</th><th>Policy</th><th>Reason</th></tr></thead><tbody id="logs-table-body"></tbody></table></div></section>
-<section class="tab-panel hidden" data-panel="security"><div class="panel-header"><div><h1>Security Lab</h1><p class="muted">Replay a decision or simulate a compromised identity without sending traffic upstream.</p></div></div><div class="editor"><h2>Decision Replay / Attack Simulator</h2><div class="form-grid"><label class="full-width">Identity<input id="r-subject" type="text" /></label><label class="checkbox-label"><input id="r-authenticated" type="checkbox" /> Authenticated</label><label class="checkbox-label"><input id="r-posture" type="checkbox" /> Healthy device posture</label><label class="checkbox-label"><input id="r-cert" type="checkbox" /> Valid certificate</label><label class="checkbox-label"><input id="r-policy" type="checkbox" /> Policy allows request</label><label>Authentication<select id="r-method"><option value="mtls">mTLS / SPIFFE</option><option value="jwt">JWT fallback</option><option value="none">None</option></select></label><label class="checkbox-label"><input id="r-sensitive" type="checkbox" /> Sensitive resource</label><label>Recent denials<input id="r-denials" type="number" min="0" max="100" value="0" /></label></div><div class="editor-actions"><button id="security-run" class="primary">Run Simulation</button><button id="security-reset">Reset</button></div></div><div id="security-result" class="card"><p class="muted">Configure the scenario and run it.</p></div></section>
-<section class="tab-panel hidden" data-panel="rotation"><div class="panel-header"><div><h1>Certificate Rotation</h1><span class="muted">Live certificate lifecycle control</span></div><button id="rotate-now" class="primary">Rotate Now</button></div><div id="rotation-status"></div></section>
-</main><script type="module" src="main.js"></script></body></html>
+  <section class="tab-panel" data-panel="dashboard">
+    <section class="dashboard-hero card">
+      <div class="dashboard-copy">
+        <span class="eyebrow">Zero Trust control plane</span>
+        <h1>Security dashboard</h1>
+        <p class="intro-lead">Operate the local Identity-Aware Proxy from one place: review enforcement, inspect decisions, replay risk scenarios and monitor certificate lifecycle.</p>
+        <div class="hero-actions">
+          <button class="primary" data-jump="policies">Review Policies</button>
+          <button class="secondary" data-jump="security">Open Security Lab</button>
+        </div>
+      </div>
+      <div class="hero-status">
+        <span class="status-dot"></span>
+        <div><strong>Local control plane</strong><span>Admin API :8444</span></div>
+      </div>
+    </section>
+
+    <section class="stat-grid">
+      <button class="stat-card" data-jump="policies"><span class="stat-icon">◆</span><span class="stat-label">Policies</span><strong>Access control</strong><span>Review identity, path, method and posture rules.</span></button>
+      <button class="stat-card" data-jump="logs"><span class="stat-icon">↯</span><span class="stat-label">Access Logs</span><strong>Decision evidence</strong><span>Inspect LIVE, SIMULATION and SYSTEM events.</span></button>
+      <button class="stat-card" data-jump="security"><span class="stat-icon">⌁</span><span class="stat-label">Security Lab</span><strong>Risk replay</strong><span>Test deterministic scenarios without upstream traffic.</span></button>
+      <button class="stat-card" data-jump="rotation"><span class="stat-icon">◇</span><span class="stat-label">Certificates</span><strong>Lifecycle status</strong><span>Inspect expiry, serials and Vault rotation state.</span></button>
+    </section>
+
+    <section class="dashboard-grid">
+      <div class="card workflow-card">
+        <div class="section-heading"><div><span class="eyebrow">Request path</span><h2>How Zero Trust is enforced</h2></div></div>
+        <div class="flow">
+          <div class="flow-step"><b>01</b><strong>Identity</strong><span>mTLS / SPIFFE or JWT</span></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step"><b>02</b><strong>Posture</strong><span>Device security facts</span></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step"><b>03</b><strong>Policy</strong><span>Subject / path / method</span></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step"><b>04</b><strong>Risk</strong><span>Allow / deny / step-up</span></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step"><b>05</b><strong>Upstream</strong><span>Protected application</span></div>
+        </div>
+      </div>
+
+      <div class="card quickstart-card">
+        <div class="section-heading"><div><span class="eyebrow">Local demo</span><h2>How to use</h2></div></div>
+        <ol class="steps">
+          <li>Enter the admin token and select <b>Save</b>.</li>
+          <li>Use <b>Policies</b> to review or edit access rules.</li>
+          <li>Use <b>Access Logs</b> to inspect real and simulated decisions.</li>
+          <li>Use <b>Security Lab</b> to replay deterministic risk scenarios.</li>
+          <li>Use <b>Cert Rotation</b> to inspect lifecycle status and Vault rotation.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="card endpoints-card">
+      <div class="section-heading"><div><span class="eyebrow">Demo endpoints</span><h2>Local services</h2></div></div>
+      <div class="endpoint-grid">
+        <div><span>Admin Console</span><code>http://127.0.0.1:8444</code><small>Policies, logs, lab and certificate lifecycle</small></div>
+        <div><span>Protected IAP</span><code>https://localhost:8443/dashboard</code><small>mTLS + identity + posture + policy + risk</small></div>
+        <div><span>Demo upstream</span><code>http://127.0.0.1:8081/dashboard</code><small>Placeholder application behind the IAP</small></div>
+        <div><span>Posture Agent</span><code>http://127.0.0.1:9443</code><small>Local device posture source for the demo</small></div>
+      </div>
+    </section>
+  </section>
+
+  <section class="tab-panel hidden" data-panel="policies">
+    <div class="panel-header"><h1>Access Policies</h1><button id="new-policy-btn" class="primary">+ New Policy</button></div>
+    <div id="policies-list" class="cards-grid"></div>
+    <div id="policy-editor" class="editor hidden"><h2>Edit Policy</h2><div class="form-grid"><label>ID<input id="f-id" type="text" /></label><label class="checkbox-label"><input id="f-enabled" type="checkbox" /> Enabled</label><label class="full-width">Description<textarea id="f-describe" rows="2"></textarea></label><label class="full-width">Subjects<textarea id="f-subjects" rows="3"></textarea></label><label class="full-width">Path prefixes<textarea id="f-paths" rows="2"></textarea></label><label class="full-width">Methods<input id="f-methods" type="text" /></label><fieldset class="full-width posture-fields"><legend>Required device posture</legend><label class="checkbox-label"><input id="f-disk" type="checkbox" /> Disk encryption</label><label class="checkbox-label"><input id="f-edr" type="checkbox" /> EDR running</label><label>Min patch level<input id="f-patch" type="text" /></label></fieldset></div><div class="editor-actions"><button id="editor-save" class="primary">Save Policy</button><button id="editor-cancel">Cancel</button></div></div>
+  </section>
+
+  <section class="tab-panel hidden" data-panel="logs">
+    <div class="panel-header"><div><h1>Access Logs</h1><span class="muted">Live requests, Security Lab simulations and system events</span></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Time</th><th>Source</th><th>Subject</th><th>Request</th><th>Auth</th><th>Decision</th><th>Risk</th><th>Policy</th><th>Reason</th></tr></thead><tbody id="logs-table-body"></tbody></table></div>
+  </section>
+
+  <section class="tab-panel hidden" data-panel="security">
+    <div class="panel-header"><div><h1>Security Lab</h1><p class="muted">Replay a decision or simulate a compromised identity without sending traffic upstream.</p></div></div>
+    <div class="editor"><h2>Decision Replay / Attack Simulator</h2><div class="form-grid"><label class="full-width">Identity<input id="r-subject" type="text" /></label><label class="checkbox-label"><input id="r-authenticated" type="checkbox" /> Authenticated</label><label class="checkbox-label"><input id="r-posture" type="checkbox" /> Healthy device posture</label><label class="checkbox-label"><input id="r-cert" type="checkbox" /> Valid certificate</label><label class="checkbox-label"><input id="r-policy" type="checkbox" /> Policy allows request</label><label>Authentication<select id="r-method"><option value="mtls">mTLS / SPIFFE</option><option value="jwt">JWT fallback</option><option value="none">None</option></select></label><label class="checkbox-label"><input id="r-sensitive" type="checkbox" /> Sensitive resource</label><label>Recent denials<input id="r-denials" type="number" min="0" max="100" value="0" /></label></div><div class="editor-actions"><button id="security-run" class="primary">Run Simulation</button><button id="security-reset">Reset</button></div></div>
+    <div id="security-result" class="card"><p class="muted">Configure the scenario and run it.</p></div>
+  </section>
+
+  <section class="tab-panel hidden" data-panel="rotation">
+    <div class="panel-header"><div><h1>Certificate Rotation</h1><span class="muted">Live certificate lifecycle control</span></div><button id="rotate-now" class="primary">Rotate Now</button></div>
+    <div id="rotation-status"></div>
+  </section>
+</main>
+<script type="module" src="main.js"></script>
+</body>
+</html>
