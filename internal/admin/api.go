@@ -65,10 +65,19 @@ func (a *API) handlePolicies(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(a.policyEngine.All())
 	case http.MethodPost:
 		var p policy.Policy
-		if err := json.NewDecoder(r.Body).Decode(&p); err != nil { writeError(w, http.StatusBadRequest, err.Error()); return }
-		if p.ID == "" { writeError(w, http.StatusBadRequest, "policy id is required"); return }
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if p.ID == "" {
+			writeError(w, http.StatusBadRequest, "policy id is required")
+			return
+		}
 		a.policyEngine.Upsert(p)
-		if err := a.policyEngine.Save(); err != nil { writeError(w, http.StatusInternalServerError, err.Error()); return }
+		if err := a.policyEngine.Save(); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(p)
 	default:
@@ -78,21 +87,33 @@ func (a *API) handlePolicies(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handlePolicyByID(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Path[len("/api/policies/"):]
-	if id == "" { writeError(w, http.StatusBadRequest, "policy id required in path"); return }
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "policy id required in path")
+		return
+	}
 	switch r.Method {
 	case http.MethodDelete:
 		if a.policyEngine.Delete(id) {
-			if err := a.policyEngine.Save(); err != nil { writeError(w, http.StatusInternalServerError, err.Error()); return }
+			if err := a.policyEngine.Save(); err != nil {
+				writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		writeError(w, http.StatusNotFound, "policy not found")
 	case http.MethodPut:
 		var p policy.Policy
-		if err := json.NewDecoder(r.Body).Decode(&p); err != nil { writeError(w, http.StatusBadRequest, err.Error()); return }
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		p.ID = id
 		a.policyEngine.Upsert(p)
-		if err := a.policyEngine.Save(); err != nil { writeError(w, http.StatusInternalServerError, err.Error()); return }
+		if err := a.policyEngine.Save(); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		_ = json.NewEncoder(w).Encode(p)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -101,7 +122,11 @@ func (a *API) handlePolicyByID(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleLogs(w http.ResponseWriter, r *http.Request) {
 	limit := 100
-	if v := r.URL.Query().Get("limit"); v != "" { if n, err := strconv.Atoi(v); err == nil { limit = n } }
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
 	_ = json.NewEncoder(w).Encode(a.accessLog.Recent(limit))
 }
 
@@ -117,10 +142,18 @@ type SecurityReplayRequest struct {
 }
 
 func (a *API) handleSecurityReplay(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost { w.WriteHeader(http.StatusMethodNotAllowed); return }
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
 	var req SecurityReplayRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { writeError(w, http.StatusBadRequest, err.Error()); return }
-	if req.AuthMethod == "" { req.AuthMethod = "mtls" }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.AuthMethod == "" {
+		req.AuthMethod = "mtls"
+	}
 	result := a.riskEngine.Evaluate(risk.Context{Subject: req.Subject, Authenticated: req.Authenticated, PostureOK: req.PostureOK, CertificateValid: req.CertificateValid, PolicyAllowed: req.PolicyAllowed, AuthMethod: req.AuthMethod, SensitiveResource: req.SensitiveResource, RecentDenials: req.RecentDenials})
 
 	allowed := result.Decision == risk.Allow
@@ -133,14 +166,26 @@ func (a *API) handleSecurityReplay(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) handleRotationStatus(w http.ResponseWriter, r *http.Request) {
-	if a.rotator == nil { _ = json.NewEncoder(w).Encode(map[string]string{"source": "disabled"}); return }
+	if a.rotator == nil {
+		_ = json.NewEncoder(w).Encode(map[string]string{"source": "disabled"})
+		return
+	}
 	_ = json.NewEncoder(w).Encode(a.rotator.Status())
 }
 
 func (a *API) handleRotateNow(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost { w.WriteHeader(http.StatusMethodNotAllowed); return }
-	if a.rotator == nil { writeError(w, http.StatusBadRequest, "rotation is not enabled on this proxy"); return }
-	if err := a.rotator.RotateNow(context.Background()); err != nil { writeError(w, http.StatusConflict, err.Error()); return }
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if a.rotator == nil {
+		writeError(w, http.StatusBadRequest, "rotation is not enabled on this proxy")
+		return
+	}
+	if err := a.rotator.RotateNow(context.Background()); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
 	status := a.rotator.Status()
 	a.accessLog.Log(logging.Entry{Source: "SYSTEM", Subject: "system", Method: "ROTATE", Path: "certificate", RemoteAddr: "admin", Allowed: true, Reason: "certificate rotated successfully", AuthMethod: "admin", RiskAction: "ALLOW", StatusCode: http.StatusOK})
 	_ = json.NewEncoder(w).Encode(status)
